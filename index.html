@@ -1,0 +1,466 @@
+<title>Margin Tic-Tac-Toe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one centered notebook sheet on graph paper; board is the hero, controls and tally sit around it like margin notes. */
+:root {
+  --paper: #f5f6f1;
+  --grid: #dfe6ee;
+  --graphite: #2c3138;
+  --muted: #6d7580;
+  --ink-x: #2547a8;
+  --ink-o: #c2412d;
+  --sheet: #fbfcf8;
+  --rule: #c9d2dc;
+  --focus: #e0a500;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
+    --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
+  --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px;
+}
+.sheet {
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 28px clamp(16px, 5vw, 36px) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  box-shadow: 0 1px 0 var(--rule), 0 12px 30px -18px rgba(20, 30, 50, .35);
+}
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.7rem, 6vw, 2.2rem);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0;
+  text-wrap: balance;
+}
+h1 .x { color: var(--ink-x); }
+h1 .o { color: var(--ink-o); }
+.round { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  font-size: .78rem; padding: 6px 12px; border-radius: 999px; cursor: pointer; color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.seg input:checked + label { background: var(--graphite); color: var(--sheet); }
+.seg input:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 1px; }
+fieldset.seg { margin: 0; min-width: 0; position: relative; }
+fieldset.seg:disabled { opacity: .4; }
+fieldset.seg:disabled label { cursor: default; }
+
+.status {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.15rem;
+  min-height: 1.5em;
+  display: flex; align-items: center; gap: 10px;
+}
+.status .chip {
+  font-family: var(--font-mono); font-weight: 600; font-size: .8rem;
+  width: 1.9em; height: 1.9em; display: inline-grid; place-items: center;
+  border-radius: 50%; border: 1.5px solid currentColor;
+}
+.status.x .chip { color: var(--ink-x); }
+.status.o .chip { color: var(--ink-o); }
+.status.draw .chip { color: var(--muted); }
+
+.board-wrap { position: relative; width: 100%; max-width: 400px; aspect-ratio: 1; margin: 0 auto; }
+.board {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+}
+.cell {
+  appearance: none; border: 0; background: transparent; padding: 14%; margin: 0;
+  cursor: pointer; border-radius: 6px; position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.cell[aria-disabled="true"] { cursor: default; }
+.cell:not([aria-disabled="true"]):hover::after {
+  content: attr(data-ghost); position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 500; font-size: clamp(2.2rem, 12vw, 3.6rem);
+  color: var(--muted); opacity: .25;
+}
+.cell:focus-visible { outline: 2px dashed var(--focus); outline-offset: -6px; }
+.cell svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cell path, .cell circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+.cell.x path { stroke: var(--ink-x); }
+.cell.o circle { stroke: var(--ink-o); }
+.draw-in { stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .32s ease-out forwards; }
+.draw-in.second { animation-delay: .16s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.cell.dim { opacity: .3; transition: opacity .3s; }
+
+.overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.overlay .gridline { stroke: var(--graphite); stroke-width: 2.4; fill: none; stroke-linecap: round; }
+.overlay .winline { stroke: var(--graphite); stroke-width: 5; fill: none; stroke-linecap: round; opacity: .85; }
+
+.tally { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); padding-top: 16px; }
+.tally div { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.tally dt { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tally dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; font-variant-numeric: tabular-nums; }
+.tally .tx dd { color: var(--ink-x); }
+.tally .to dd { color: var(--ink-o); }
+.tally .marks { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); min-height: 1.2em; letter-spacing: .05em; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  font: 600 .85rem var(--font-mono); padding: 10px 18px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--graphite); background: var(--graphite); color: var(--sheet);
+}
+.btn.ghost { background: transparent; color: var(--graphite); }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn:hover { filter: brightness(1.12); }
+.confirm { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: .82rem; }
+.hint { text-align: center; font-size: .72rem; color: var(--muted); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .draw-in { animation: none; stroke-dashoffset: 0; }
+  .seg label, .cell.dim { transition: none; }
+}
+</style>
+
+<main class="sheet">
+  <header>
+    <h1><span class="x">Tic</span>·Tac·<span class="o">Toe</span></h1>
+    <span class="round" id="round">Round 1</span>
+  </header>
+
+  <div class="controls">
+    <fieldset class="seg" id="modeSeg">
+      <legend>Opponent</legend>
+      <input type="radio" name="mode" id="mode-ai" value="ai" checked><label for="mode-ai">vs Computer</label>
+      <input type="radio" name="mode" id="mode-pvp" value="pvp"><label for="mode-pvp">2 Players</label>
+    </fieldset>
+    <fieldset class="seg" id="diffSeg">
+      <legend>Difficulty</legend>
+      <input type="radio" name="diff" id="diff-easy" value="easy"><label for="diff-easy">Easy</label>
+      <input type="radio" name="diff" id="diff-hard" value="hard" checked><label for="diff-hard">Hard</label>
+    </fieldset>
+  </div>
+
+  <div class="status x" id="status" role="status" aria-live="polite"></div>
+
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Tic-tac-toe board"></div>
+    <svg class="overlay" viewBox="0 0 300 300" aria-hidden="true">
+      <path class="gridline" d="M101 8 C 99 90, 102 200, 100 292"/>
+      <path class="gridline" d="M199 6 C 201 110, 198 210, 200 294"/>
+      <path class="gridline" d="M8 100 C 90 102, 210 98, 292 101"/>
+      <path class="gridline" d="M6 199 C 110 201, 200 197, 294 200"/>
+      <path class="winline" id="winline" d="" />
+    </svg>
+  </div>
+
+  <dl class="tally">
+    <div class="tx"><dt id="labelX">You · X</dt><dd id="scoreX">0</dd><span class="marks" id="marksX"></span></div>
+    <div class="td"><dt>Draws</dt><dd id="scoreD">0</dd><span class="marks" id="marksD"></span></div>
+    <div class="to"><dt id="labelO">Computer · O</dt><dd id="scoreO">0</dd><span class="marks" id="marksO"></span></div>
+  </dl>
+
+  <div class="actions" id="actions">
+    <button class="btn" id="newRound" type="button">New round</button>
+    <button class="btn ghost" id="resetScores" type="button">Reset scores</button>
+  </div>
+  <div class="confirm" id="confirm" hidden>
+    <span>Clear the tally?</span>
+    <button class="btn" id="confirmYes" type="button">Clear</button>
+    <button class="btn ghost" id="confirmNo" type="button">Keep</button>
+  </div>
+
+  <p class="hint">Arrow keys move between squares · Enter or Space plays</p>
+</main>
+
+<script>
+(() => {
+  const WIN_LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  // ---------- pure logic ----------
+  function getWinner(b) {
+    for (const line of WIN_LINES) {
+      const [a, c, d] = line;
+      if (b[a] && b[a] === b[c] && b[a] === b[d]) return { player: b[a], line };
+    }
+    return null;
+  }
+  const isDraw = b => !getWinner(b) && b.every(Boolean);
+  const emptyCells = b => b.reduce((acc, v, i) => (v ? acc : (acc.push(i), acc)), []);
+  const other = p => (p === 'X' ? 'O' : 'X');
+
+  // Returns a score from `me`'s perspective; faster wins score higher.
+  function minimax(b, turn, me, depth) {
+    const w = getWinner(b);
+    if (w) return w.player === me ? 10 - depth : depth - 10;
+    if (b.every(Boolean)) return 0;
+    let best = turn === me ? -Infinity : Infinity;
+    for (const i of emptyCells(b)) {
+      b[i] = turn;
+      const s = minimax(b, other(turn), me, depth + 1);
+      b[i] = null;
+      best = turn === me ? Math.max(best, s) : Math.min(best, s);
+    }
+    return best;
+  }
+  function bestMove(b, me) {
+    let bestScore = -Infinity, moves = [];
+    for (const i of emptyCells(b)) {
+      b[i] = me;
+      const s = minimax(b, other(me), me, 1);
+      b[i] = null;
+      if (s > bestScore) { bestScore = s; moves = [i]; }
+      else if (s === bestScore) moves.push(i);
+    }
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+  function randomMove(b) {
+    const e = emptyCells(b);
+    return e[Math.floor(Math.random() * e.length)];
+  }
+
+  // ---------- state ----------
+  const AI = 'O';
+  let state = {
+    board: Array(9).fill(null),
+    current: 'X',
+    mode: 'ai',
+    difficulty: 'hard',
+    scores: { X: 0, O: 0, D: 0 },
+    round: 1,
+    gameOver: false,
+    result: null,
+    lastMove: -1
+  };
+  let aiTimer = null;
+  let focusIndex = 4;
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const boardEl = $('board');
+  const cells = [];
+  for (let i = 0; i < 9; i++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cell';
+    btn.dataset.index = i;
+    btn.setAttribute('role', 'gridcell');
+    btn.tabIndex = i === focusIndex ? 0 : -1;
+    btn.addEventListener('click', () => onCellClick(i));
+    boardEl.appendChild(btn);
+    cells.push(btn);
+  }
+
+  const SVG_X = '<svg viewBox="0 0 100 100"><path class="draw-in" style="--len:120" d="M18 18 L82 82"/><path class="draw-in second" style="--len:120" d="M82 18 L18 82"/></svg>';
+  const SVG_O = '<svg viewBox="0 0 100 100"><circle class="draw-in" style="--len:220" cx="50" cy="50" r="34" transform="rotate(-90 50 50)"/></svg>';
+  const SVG_X_STATIC = SVG_X.replace(/ class="draw-in( second)?"/g, '');
+  const SVG_O_STATIC = SVG_O.replace(/ class="draw-in"/g, '');
+
+  const isAiTurn = () => state.mode === 'ai' && state.current === AI && !state.gameOver;
+  const nameOf = p => state.mode === 'ai' ? (p === 'X' ? 'You' : 'Computer') : `Player ${p}`;
+
+  // ---------- rendering ----------
+  const rendered = Array(9).fill(null);
+  function render() {
+    const { board, result } = state;
+    const winLine = result && result.line;
+    for (let i = 0; i < 9; i++) {
+      const c = cells[i], v = board[i];
+      if (rendered[i] !== v) {
+        c.innerHTML = v ? (i === state.lastMove ? (v === 'X' ? SVG_X : SVG_O) : (v === 'X' ? SVG_X_STATIC : SVG_O_STATIC)) : '';
+        rendered[i] = v;
+      }
+      c.classList.toggle('x', v === 'X');
+      c.classList.toggle('o', v === 'O');
+      c.classList.toggle('dim', !!winLine && !winLine.includes(i));
+      c.setAttribute('aria-disabled', String(!!v || state.gameOver || isAiTurn()));
+      c.dataset.ghost = state.current;
+      const row = Math.floor(i / 3) + 1, col = (i % 3) + 1;
+      c.setAttribute('aria-label', `Row ${row}, column ${col}, ${v ? v : 'empty'}`);
+      c.tabIndex = i === focusIndex ? 0 : -1;
+    }
+
+    // status line
+    const st = $('status');
+    st.className = 'status';
+    if (result && result.player) {
+      st.classList.add(result.player.toLowerCase());
+      const who = nameOf(result.player);
+      st.innerHTML = `<span class="chip">${result.player}</span> ${who === 'You' ? 'You win this round.' : who + ' wins this round.'}`;
+    } else if (result) {
+      st.classList.add('draw');
+      st.innerHTML = `<span class="chip">=</span> Cat's game. Nobody wins.`;
+    } else {
+      st.classList.add(state.current.toLowerCase());
+      const who = nameOf(state.current);
+      const msg = isAiTurn() ? 'Computer is thinking…' : (who === 'You' ? 'Your move.' : `${who} to move.`);
+      st.innerHTML = `<span class="chip">${state.current}</span> ${msg}`;
+    }
+
+    // win line across the board
+    const wl = $('winline');
+    if (winLine) {
+      const ctr = i => [ (i % 3) * 100 + 50, Math.floor(i / 3) * 100 + 50 ];
+      const [x1, y1] = ctr(winLine[0]), [x2, y2] = ctr(winLine[2]);
+      const ext = 34, dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+      const ux = dx / len, uy = dy / len;
+      wl.setAttribute('d', `M${x1 - ux * ext} ${y1 - uy * ext} L${x2 + ux * ext} ${y2 + uy * ext}`);
+      wl.style.stroke = result.player === 'X' ? 'var(--ink-x)' : 'var(--ink-o)';
+    } else {
+      wl.setAttribute('d', '');
+    }
+
+    // tally
+    const tallyMarks = n => n > 20 ? '' : '||||/ '.repeat(Math.floor(n / 5)) + '|'.repeat(n % 5);
+    $('scoreX').textContent = state.scores.X;
+    $('scoreO').textContent = state.scores.O;
+    $('scoreD').textContent = state.scores.D;
+    $('marksX').textContent = tallyMarks(state.scores.X);
+    $('marksO').textContent = tallyMarks(state.scores.O);
+    $('marksD').textContent = tallyMarks(state.scores.D);
+    $('labelX').textContent = state.mode === 'ai' ? 'You · X' : 'Player X';
+    $('labelO').textContent = state.mode === 'ai' ? 'Computer · O' : 'Player O';
+    $('round').textContent = `Round ${state.round}`;
+
+    $('diffSeg').disabled = state.mode !== 'ai';
+    $(`mode-${state.mode}`).checked = true;
+    $(`diff-${state.difficulty}`).checked = true;
+  }
+
+  // ---------- game flow ----------
+  function play(i) {
+    if (state.gameOver || state.board[i]) return;
+    state.board[i] = state.current;
+    state.lastMove = i;
+    const w = getWinner(state.board);
+    if (w) {
+      state.gameOver = true; state.result = w; state.scores[w.player]++;
+    } else if (isDraw(state.board)) {
+      state.gameOver = true; state.result = { player: null }; state.scores.D++;
+    } else {
+      state.current = other(state.current);
+    }
+    render();
+    if (isAiTurn()) scheduleAi();
+  }
+
+  function scheduleAi() {
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(() => {
+      if (!isAiTurn()) return;
+      const b = state.board.slice();
+      const move = state.difficulty === 'hard' ? bestMove(b, AI) : randomMove(b);
+      play(move);
+    }, 420);
+  }
+
+  function onCellClick(i) {
+    if (isAiTurn()) return;
+    focusIndex = i;
+    play(i);
+  }
+
+  function newRound() {
+    clearTimeout(aiTimer);
+    state.board = Array(9).fill(null);
+    state.gameOver = false;
+    state.result = null;
+    state.lastMove = -1;
+    state.round++;
+    // Alternate who opens each round so the computer gets to start sometimes.
+    state.current = state.round % 2 === 1 ? 'X' : 'O';
+    render();
+    if (isAiTurn()) scheduleAi();
+  }
+
+  function restartFresh() {
+    state.round = 0;
+    newRound();
+  }
+
+  // ---------- controls ----------
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', e => {
+    state.mode = e.target.value; restartFresh();
+  }));
+  document.querySelectorAll('input[name="diff"]').forEach(r => r.addEventListener('change', e => {
+    state.difficulty = e.target.value; restartFresh();
+  }));
+  $('newRound').addEventListener('click', newRound);
+  $('resetScores').addEventListener('click', () => { $('actions').hidden = true; $('confirm').hidden = false; $('confirmNo').focus(); });
+  $('confirmNo').addEventListener('click', () => { $('confirm').hidden = true; $('actions').hidden = false; $('resetScores').focus(); });
+  $('confirmYes').addEventListener('click', () => {
+    state.scores = { X: 0, O: 0, D: 0 };
+    $('confirm').hidden = true; $('actions').hidden = false;
+    restartFresh(); $('newRound').focus();
+  });
+
+  boardEl.addEventListener('keydown', e => {
+    const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 };
+    if (!(e.key in moves)) return;
+    e.preventDefault();
+    let r = Math.floor(focusIndex / 3), c = focusIndex % 3;
+    if (e.key === 'ArrowLeft') c = (c + 2) % 3;
+    if (e.key === 'ArrowRight') c = (c + 1) % 3;
+    if (e.key === 'ArrowUp') r = (r + 2) % 3;
+    if (e.key === 'ArrowDown') r = (r + 1) % 3;
+    focusIndex = r * 3 + c;
+    cells.forEach((cell, i) => cell.tabIndex = i === focusIndex ? 0 : -1);
+    cells[focusIndex].focus();
+  });
+  // Keep the roving focus target in sync when a square is focused by mouse or Tab.
+  boardEl.addEventListener('focusin', e => {
+    const i = Number(e.target.dataset.index);
+    if (!Number.isNaN(i)) focusIndex = i;
+  });
+
+  // ---------- boot (keeps the game across live updates) ----------
+  function start(saved) {
+    if (saved && saved.state) {
+      state = Object.assign(state, saved.state);
+      state.lastMove = -1;
+    }
+    render();
+    if (isAiTurn()) scheduleAi();
+  }
+  window.claude?.hot?.snapshot?.(() => ({ state }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
