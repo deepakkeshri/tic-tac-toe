@@ -20,6 +20,7 @@
   --focus: #e0a500;
   --ok: #2f8a4c;
   --wait: #c58a00;
+  --hi: #fdf0b4;
   --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 }
@@ -27,14 +28,14 @@
   :root:not([data-theme="light"]) {
     --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
     --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
-    --ok: #5fd08a; --wait: #f2c14e;
+    --ok: #5fd08a; --wait: #f2c14e; --hi: #2f2e22;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
   --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
-  --ok: #5fd08a; --wait: #f2c14e;
+  --ok: #5fd08a; --wait: #f2c14e; --hi: #2f2e22;
   color-scheme: dark;
 }
 
@@ -56,7 +57,7 @@ body {
   padding-block: max(32px, env(safe-area-inset-top, 0px)) max(48px, env(safe-area-inset-bottom, 0px));
 }
 .sheet {
-  max-width: 520px;
+  max-width: 540px;
   margin: 0 auto;
   background: var(--sheet);
   border: 1px solid var(--rule);
@@ -81,7 +82,7 @@ h1 .x { color: var(--ink-x); }
 h1 .o { color: var(--ink-o); }
 .round { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 
-.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
 .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
@@ -94,6 +95,10 @@ h1 .o { color: var(--ink-o); }
 fieldset.seg { margin: 0; min-width: 0; position: relative; }
 fieldset.seg:disabled { opacity: .4; }
 fieldset.seg:disabled label { cursor: default; }
+.seg.rules input:checked + label { background: var(--hi); color: var(--graphite); box-shadow: inset 0 0 0 1.5px var(--graphite); }
+
+.rules-note { margin: 0; font-size: .8rem; line-height: 1.55; color: var(--muted); max-width: 62ch; }
+.rules-note b { color: var(--graphite); font-weight: 600; }
 
 /* Online room panel: reads like a note clipped to the sheet */
 .online {
@@ -132,14 +137,14 @@ fieldset.seg:disabled label { cursor: default; }
 .status.o .chip { color: var(--ink-o); }
 .status.draw .chip { color: var(--muted); }
 
-.board-wrap { position: relative; width: 100%; max-width: 400px; aspect-ratio: 1; margin: 0 auto; }
+.board-wrap { position: relative; width: 100%; max-width: 440px; aspect-ratio: 1; margin: 0 auto; }
 .board {
   position: absolute; inset: 0;
   display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
 }
 .cell {
   appearance: none; border: 0; background: transparent; padding: 14%; margin: 0;
-  cursor: pointer; border-radius: 6px; position: relative;
+  cursor: pointer; border-radius: 6px; position: relative; min-width: 0; min-height: 0;
   -webkit-tap-highlight-color: transparent;
 }
 .cell[aria-disabled="true"] { cursor: default; }
@@ -149,7 +154,7 @@ fieldset.seg:disabled label { cursor: default; }
   color: var(--muted); opacity: .25;
 }
 .cell:focus-visible { outline: 2px dashed var(--focus); outline-offset: -6px; }
-.cell svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.cell svg { width: 100%; height: 100%; display: block; overflow: visible; transition: opacity .25s; }
 .cell path, .cell circle { fill: none; stroke-width: 9; stroke-linecap: round; }
 .cell.x path { stroke: var(--ink-x); }
 .cell.o circle { stroke: var(--ink-o); }
@@ -158,13 +163,37 @@ fieldset.seg:disabled label { cursor: default; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 .cell.dim { opacity: .3; transition: opacity .3s; }
 
+/* Vanishing: the mark about to be rubbed out goes pale */
+.cell.fading svg { opacity: .28; }
+
+/* Ultimate: nine small boards; the one you must play in is highlighted like a marker swipe */
+.board.ultimate .sub {
+  position: relative; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+  margin: 7%; border-radius: 3px; transition: background .2s, opacity .3s; min-width: 0; min-height: 0;
+}
+.board.ultimate .sub.active { background: var(--hi); box-shadow: 0 0 0 4px var(--hi); }
+.board.ultimate .cell { padding: 13%; border-radius: 0; }
+.board.ultimate .cell:nth-of-type(-n+6) { border-bottom: 1.4px solid var(--rule); }
+.board.ultimate .cell:not(:nth-of-type(3n)) { border-right: 1.4px solid var(--rule); }
+.board.ultimate .cell path, .board.ultimate .cell circle { stroke-width: 12; }
+.board.ultimate .cell:not([aria-disabled="true"]):hover::after { font-size: clamp(.85rem, 4.5vw, 1.35rem); }
+.board.ultimate .cell:focus-visible { outline-offset: -2px; }
+.claim { position: absolute; inset: 6%; pointer-events: none; }
+.claim svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.claim path, .claim circle { fill: none; stroke-width: 8; stroke-linecap: round; }
+.sub.won-x .claim path { stroke: var(--ink-x); }
+.sub.won-o .claim circle { stroke: var(--ink-o); }
+.sub.won-x .cell, .sub.won-o .cell { opacity: .2; }
+.sub.drawn .cell { opacity: .35; }
+.sub.dim { opacity: .3; }
+
 .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .overlay .gridline { stroke: var(--graphite); stroke-width: 2.4; fill: none; stroke-linecap: round; }
 .overlay .winline { stroke: var(--graphite); stroke-width: 5; fill: none; stroke-linecap: round; opacity: .85; }
 
 .tally { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); padding-top: 16px; margin: 0; }
 .tally div { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
-.tally dt { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tally dt { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; max-width: 100%; padding-inline: 4px; }
 .tally dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; font-variant-numeric: tabular-nums; }
 .tally .tx dd { color: var(--ink-x); }
 .tally .to dd { color: var(--ink-o); }
@@ -213,11 +242,10 @@ fieldset.seg:disabled label { cursor: default; }
   border: 0; border-bottom: 1.5px solid var(--rule); padding: 4px 2px; width: 9em; min-width: 0;
 }
 .p2 input:focus-visible { outline: none; border-bottom-color: var(--focus); }
-.tally dt { overflow-wrap: anywhere; max-width: 100%; padding-inline: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
   .draw-in { animation: none; stroke-dashoffset: 0; }
-  .seg label, .cell.dim { transition: none; }
+  .seg label, .cell.dim, .cell svg, .board.ultimate .sub { transition: none; }
   .dot[data-state="waiting"] { animation: none; }
 }
 </style>
@@ -238,6 +266,12 @@ fieldset.seg:disabled label { cursor: default; }
 
   <div class="game-area" id="gameArea" hidden>
   <div class="controls">
+    <fieldset class="seg rules" id="rulesSeg">
+      <legend>Rules</legend>
+      <input type="radio" name="rules" id="rules-classic" value="classic" checked><label for="rules-classic">Classic</label>
+      <input type="radio" name="rules" id="rules-vanish" value="vanish"><label for="rules-vanish">Vanishing</label>
+      <input type="radio" name="rules" id="rules-ultimate" value="ultimate"><label for="rules-ultimate">Ultimate</label>
+    </fieldset>
     <fieldset class="seg" id="modeSeg">
       <legend>Opponent</legend>
       <input type="radio" name="mode" id="mode-ai" value="ai" checked><label for="mode-ai">vs Computer</label>
@@ -251,6 +285,8 @@ fieldset.seg:disabled label { cursor: default; }
     </fieldset>
     <label class="p2" id="p2Wrap" hidden>O is <input id="p2Name" maxlength="20" placeholder="Player O" spellcheck="false"></label>
   </div>
+
+  <p class="rules-note" id="rulesNote" hidden></p>
 
   <section class="online" id="online" hidden aria-label="Online room">
     <div class="online-row"><span class="dot" id="onlineDot"></span><span id="onlineText"></span></div>
@@ -304,6 +340,9 @@ fieldset.seg:disabled label { cursor: default; }
     [0,3,6],[1,4,7],[2,5,8],
     [0,4,8],[2,4,6]
   ];
+  const BOARD_NAMES = ['top-left', 'top', 'top-right', 'left', 'centre', 'right', 'bottom-left', 'bottom', 'bottom-right'];
+  const RULE_NAMES = { classic: 'Classic', vanish: 'Vanishing', ultimate: 'Ultimate' };
+  const VANISH_KEEP = 3;
 
   // ---------- pure logic ----------
   function getWinner(b) {
@@ -313,11 +352,73 @@ fieldset.seg:disabled label { cursor: default; }
     }
     return null;
   }
-  const isDraw = b => !getWinner(b) && b.every(Boolean);
   const emptyCells = b => b.reduce((acc, v, i) => (v ? acc : (acc.push(i), acc)), []);
   const other = p => (p === 'X' ? 'O' : 'X');
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
-  // Returns a score from `me`'s perspective; faster wins score higher.
+  // One engine for all three rule sets. States are plain data so they can be sent online.
+  //   classic  – 9 cells
+  //   vanish   – 9 cells; each player keeps their last 3 marks, a 4th erases the oldest
+  //   ultimate – 81 cells (board b, square s at b*9+s); your square picks the opponent's next board
+  function newEngine(rules) {
+    return {
+      rules,
+      board: Array(rules === 'ultimate' ? 81 : 9).fill(null),
+      queue: { X: [], O: [] },
+      small: Array(9).fill(null),
+      next: -1,
+      current: 'X',
+      winner: null, line: null, draw: false,
+      lastMove: -1, vanished: -1
+    };
+  }
+  function openBoards(g) {
+    if (g.next >= 0 && !g.small[g.next]) return [g.next];
+    const r = [];
+    for (let b = 0; b < 9; b++) if (!g.small[b]) r.push(b);
+    return r;
+  }
+  function legalMoves(g) {
+    if (g.winner || g.draw) return [];
+    if (g.rules !== 'ultimate') return emptyCells(g.board);
+    const out = [];
+    for (const b of openBoards(g)) for (let s = 0; s < 9; s++) if (!g.board[b * 9 + s]) out.push(b * 9 + s);
+    return out;
+  }
+  function step(g, i) {
+    const p = g.current, board = g.board.slice();
+    const n = {
+      rules: g.rules, board, queue: g.queue, small: g.small, next: g.next, current: other(p),
+      winner: null, line: null, draw: false, lastMove: i, vanished: -1
+    };
+    if (g.rules === 'vanish') {
+      const q = { X: g.queue.X.slice(), O: g.queue.O.slice() };
+      if (q[p].length >= VANISH_KEEP) { n.vanished = q[p].shift(); board[n.vanished] = null; }
+      board[i] = p; q[p].push(i); n.queue = q;
+      const w = getWinner(board);
+      if (w) { n.winner = p; n.line = w.line; }
+    } else if (g.rules === 'ultimate') {
+      board[i] = p;
+      const b = Math.floor(i / 9), s = i % 9;
+      const sub = board.slice(b * 9, b * 9 + 9);
+      const w = getWinner(sub);
+      if (w || sub.every(Boolean)) { n.small = g.small.slice(); n.small[b] = w ? p : 'D'; }
+      n.next = s;
+      const big = getWinner(n.small.map(v => (v === 'D' ? null : v)));
+      if (big) { n.winner = p; n.line = big.line; }
+      else if (n.small.every(Boolean)) n.draw = true;
+    } else {
+      board[i] = p;
+      const w = getWinner(board);
+      if (w) { n.winner = p; n.line = w.line; }
+      else if (board.every(Boolean)) n.draw = true;
+    }
+    if (n.winner || n.draw) n.current = p;
+    return n;
+  }
+
+  // ---------- computer players ----------
+  // Classic: full minimax, never loses.
   function minimax(b, turn, me, depth) {
     const w = getWinner(b);
     if (w) return w.player === me ? 10 - depth : depth - 10;
@@ -331,7 +432,7 @@ fieldset.seg:disabled label { cursor: default; }
     }
     return best;
   }
-  function bestMove(b, me) {
+  function classicBest(b, me) {
     let bestScore = -Infinity, moves = [];
     for (const i of emptyCells(b)) {
       b[i] = me;
@@ -340,24 +441,96 @@ fieldset.seg:disabled label { cursor: default; }
       if (s > bestScore) { bestScore = s; moves = [i]; }
       else if (s === bestScore) moves.push(i);
     }
-    return moves[Math.floor(Math.random() * moves.length)];
+    return pick(moves);
   }
-  function randomMove(b) {
-    const e = emptyCells(b);
-    return e[Math.floor(Math.random() * e.length)];
+
+  // Vanishing: games never fill up, so search a fixed number of moves ahead and score open lines.
+  function vanishEval(g, p) {
+    const o = other(p), b = g.board;
+    // A mark that is about to be erased is worth less.
+    const doomed = { X: g.queue.X.length >= VANISH_KEEP ? g.queue.X[0] : -1, O: g.queue.O.length >= VANISH_KEEP ? g.queue.O[0] : -1 };
+    let s = 0;
+    for (const line of WIN_LINES) {
+      let mine = 0, theirs = 0;
+      for (const i of line) {
+        if (b[i] === p) mine += i === doomed[p] ? 0.5 : 1;
+        else if (b[i] === o) theirs += i === doomed[o] ? 0.5 : 1;
+      }
+      if (!theirs) s += mine >= 2 ? 4 * mine : mine;
+      if (!mine) s -= theirs >= 2 ? 4 * theirs : theirs;
+    }
+    if (b[4] === p) s += 1; else if (b[4] === o) s -= 1;
+    return s;
+  }
+  function vanishSearch(g, depth, alpha, beta, ply) {
+    if (g.winner) return -(1000 - ply);
+    if (depth === 0) return vanishEval(g, g.current);
+    let best = -Infinity;
+    for (const m of legalMoves(g)) {
+      const v = -vanishSearch(step(g, m), depth - 1, -beta, -alpha, ply + 1);
+      if (v > best) best = v;
+      if (v > alpha) alpha = v;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  function vanishBest(g, depth = 10) {
+    let bestScore = -Infinity, moves = [];
+    for (const m of legalMoves(g)) {
+      const v = -vanishSearch(step(g, m), depth - 1, -Infinity, Infinity, 1);
+      if (v > bestScore) { bestScore = v; moves = [m]; }
+      else if (v === bestScore) moves.push(m);
+    }
+    return pick(moves);
+  }
+
+  // Ultimate: too big to search fully, so play thousands of random games from each option
+  // and keep the move that wins most often (Monte Carlo tree search).
+  function ultimateBest(root, ms = 700) {
+    const legal = legalMoves(root);
+    for (const m of legal) if (step(root, m).winner) return m;
+    const rootNode = { s: root, m: -1, parent: null, kids: [], untried: legal.slice(), n: 0, w: 0, by: other(root.current) };
+    const end = performance.now() + ms;
+    let iter = 0;
+    while ((iter & 63) || performance.now() < end) {
+      iter++;
+      let node = rootNode;
+      while (!node.untried.length && node.kids.length) {
+        const ln = Math.log(node.n);
+        let best = null, bv = -Infinity;
+        for (const k of node.kids) {
+          const v = k.w / k.n + 1.25 * Math.sqrt(ln / k.n);
+          if (v > bv) { bv = v; best = k; }
+        }
+        node = best;
+      }
+      if (node.untried.length) {
+        const m = node.untried.splice(Math.floor(Math.random() * node.untried.length), 1)[0];
+        const s = step(node.s, m);
+        const kid = { s, m, parent: node, kids: [], untried: legalMoves(s), n: 0, w: 0, by: node.s.current };
+        node.kids.push(kid);
+        node = kid;
+      }
+      let s = node.s;
+      while (!s.winner && !s.draw) s = step(s, pick(legalMoves(s)));
+      for (let k = node; k; k = k.parent) {
+        k.n++;
+        if (s.winner === k.by) k.w += 1; else if (s.draw) k.w += 0.5;
+      }
+    }
+    let best = null;
+    for (const k of rootNode.kids) if (!best || k.n > best.n) best = k;
+    return best ? best.m : pick(legal);
   }
 
   // ---------- state ----------
   const AI = 'O';
   const ROOM_PREFIX = 'margin-ttt-';
-  const freshGame = () => ({
-    board: Array(9).fill(null),
-    current: 'X',
+  const freshGame = (rules = 'classic') => Object.assign(newEngine(rules), {
     scores: { X: 0, O: 0, D: 0 },
     round: 1,
     gameOver: false,
-    result: null,
-    lastMove: -1
+    result: null
   });
   let game = freshGame();
   let mode = 'ai';
@@ -373,23 +546,51 @@ fieldset.seg:disabled label { cursor: default; }
   // ---------- DOM ----------
   const $ = id => document.getElementById(id);
   const boardEl = $('board');
-  const cells = [];
-  for (let i = 0; i < 9; i++) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cell';
-    btn.dataset.index = i;
-    btn.setAttribute('role', 'gridcell');
-    btn.tabIndex = i === focusIndex ? 0 : -1;
-    btn.addEventListener('click', () => onCellClick(i));
-    boardEl.appendChild(btn);
-    cells.push(btn);
-  }
+  let cells = [], subs = [], rendered = [], claimShown = [], builtRules = null;
 
   const SVG_X = '<svg viewBox="0 0 100 100"><path class="draw-in" style="--len:120" d="M18 18 L82 82"/><path class="draw-in second" style="--len:120" d="M82 18 L18 82"/></svg>';
   const SVG_O = '<svg viewBox="0 0 100 100"><circle class="draw-in" style="--len:220" cx="50" cy="50" r="34" transform="rotate(-90 50 50)"/></svg>';
   const SVG_X_STATIC = SVG_X.replace(/ class="draw-in( second)?"/g, '');
   const SVG_O_STATIC = SVG_O.replace(/ class="draw-in"/g, '');
+
+  function makeCell(i) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cell';
+    btn.dataset.index = i;
+    btn.setAttribute('role', 'gridcell');
+    btn.addEventListener('click', () => onCellClick(i));
+    cells.push(btn);
+    return btn;
+  }
+  function buildBoard() {
+    const ult = game.rules === 'ultimate';
+    boardEl.innerHTML = '';
+    cells = []; subs = [];
+    boardEl.classList.toggle('ultimate', ult);
+    if (!ult) {
+      for (let i = 0; i < 9; i++) boardEl.appendChild(makeCell(i));
+    } else {
+      for (let b = 0; b < 9; b++) {
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        for (let s = 0; s < 9; s++) sub.appendChild(makeCell(b * 9 + s));
+        const claim = document.createElement('div');
+        claim.className = 'claim';
+        sub.appendChild(claim);
+        boardEl.appendChild(sub);
+        subs.push(sub);
+      }
+    }
+    rendered = Array(cells.length).fill(undefined);
+    claimShown = Array(9).fill(null);
+    builtRules = game.rules;
+    focusIndex = ult ? 40 : 4;
+  }
+  function resetRendered() {
+    rendered.fill(undefined);
+    claimShown.fill(null);
+  }
 
   const isAiTurn = () => mode === 'ai' && game.current === AI && !game.gameOver;
   function canPlay() {
@@ -398,6 +599,7 @@ fieldset.seg:disabled label { cursor: default; }
     if (mode === 'online') return connected() && game.current === myMark();
     return true;
   }
+
   // ---------- names ----------
   const cleanName = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, 20);
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -416,12 +618,22 @@ fieldset.seg:disabled label { cursor: default; }
   }
 
   // ---------- rendering ----------
-  const rendered = Array(9).fill(null);
+  const RULE_NOTES = {
+    vanish: '<b>Vanishing:</b> each player keeps only 3 marks. Placing a 4th rubs out your oldest one, shown faded. There are no draws.',
+    ultimate: '<b>Ultimate:</b> nine small boards. The square you pick sends your opponent to the matching small board (pick the top-right square, they play in the top-right board). Win a small board to claim it; claim three in a row to win. Sent to a finished board? Play in any open one.'
+  };
+
   function render() {
+    if (builtRules !== game.rules) buildBoard();
     const { board, result } = game;
+    const ult = game.rules === 'ultimate';
     const winLine = result && result.line;
     const playable = canPlay();
-    for (let i = 0; i < 9; i++) {
+    const legal = new Set(playable ? legalMoves(game) : []);
+    const fading = game.rules === 'vanish' && !game.gameOver && game.queue[game.current].length >= VANISH_KEEP
+      ? game.queue[game.current][0] : -1;
+
+    for (let i = 0; i < cells.length; i++) {
       const c = cells[i], v = board[i];
       if (rendered[i] !== v) {
         c.innerHTML = v ? (i === game.lastMove ? (v === 'X' ? SVG_X : SVG_O) : (v === 'X' ? SVG_X_STATIC : SVG_O_STATIC)) : '';
@@ -429,12 +641,36 @@ fieldset.seg:disabled label { cursor: default; }
       }
       c.classList.toggle('x', v === 'X');
       c.classList.toggle('o', v === 'O');
-      c.classList.toggle('dim', !!winLine && !winLine.includes(i));
-      c.setAttribute('aria-disabled', String(!!v || !playable));
+      c.classList.toggle('dim', !ult && !!winLine && !winLine.includes(i));
+      c.classList.toggle('fading', i === fading);
+      c.setAttribute('aria-disabled', String(!legal.has(i)));
       c.dataset.ghost = game.current;
-      const row = Math.floor(i / 3) + 1, col = (i % 3) + 1;
-      c.setAttribute('aria-label', `Row ${row}, column ${col}, ${v ? v : 'empty'}`);
+      let where;
+      if (ult) {
+        const b = Math.floor(i / 9), s = i % 9;
+        where = `${BOARD_NAMES[b]} board, row ${Math.floor(s / 3) + 1}, column ${(s % 3) + 1}`;
+      } else {
+        where = `Row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1}`;
+      }
+      c.setAttribute('aria-label', `${where}, ${v ? v : 'empty'}${i === fading ? ', vanishes next' : ''}`);
       c.tabIndex = i === focusIndex ? 0 : -1;
+    }
+
+    if (ult) {
+      const open = game.gameOver ? [] : openBoards(game);
+      const restricted = open.length === 1 && game.small.filter(v => !v).length > 1;
+      subs.forEach((sub, b) => {
+        const owner = game.small[b];
+        sub.classList.toggle('active', restricted && open[0] === b);
+        sub.classList.toggle('won-x', owner === 'X');
+        sub.classList.toggle('won-o', owner === 'O');
+        sub.classList.toggle('drawn', owner === 'D');
+        sub.classList.toggle('dim', !!winLine && !winLine.includes(b));
+        if (claimShown[b] !== owner) {
+          sub.lastElementChild.innerHTML = owner === 'X' ? SVG_X : owner === 'O' ? SVG_O : '';
+          claimShown[b] = owner;
+        }
+      });
     }
 
     // status line
@@ -446,20 +682,26 @@ fieldset.seg:disabled label { cursor: default; }
       const who = esc(nameOf(result.player));
       say(result.player.toLowerCase(), result.player, isMe(result.player) ? `You win this round, ${me}!` : `${who} wins this round.`);
     } else if (result) {
-      say('draw', '=', "Cat's game. Nobody wins.");
+      say('draw', '=', ult ? 'Every board is decided and nobody has three in a row. It’s a draw.' : "Cat's game. Nobody wins.");
     } else if (mode === 'online' && !connected()) {
       say(myMark().toLowerCase(), myMark(), net.role === 'host' ? 'Waiting for your friend to join.' : 'Joining the game…');
     } else {
       const who = esc(nameOf(game.current));
+      const local = isMe(game.current) || mode === 'pvp';
       let msg;
       if (isAiTurn()) msg = 'Computer is thinking…';
       else if (isMe(game.current)) msg = `Your move, ${me}.`;
       else if (mode === 'online') msg = `${who} is thinking…`;
       else msg = `${who}’s move.`;
+      if (local && ult) {
+        const open = openBoards(game);
+        msg += open.length === 1 ? ` Play in the ${BOARD_NAMES[open[0]]} board.` : ' Play in any open board.';
+      }
+      if (local && fading >= 0) msg += ' Your faded mark vanishes next.';
       say(game.current.toLowerCase(), game.current, msg);
     }
 
-    // win line across the board
+    // win line across the board (for Ultimate it runs across the small boards)
     const wl = $('winline');
     if (winLine) {
       const ctr = i => [ (i % 3) * 100 + 50, Math.floor(i / 3) * 100 + 50 ];
@@ -485,11 +727,20 @@ fieldset.seg:disabled label { cursor: default; }
     $('p2Wrap').hidden = mode !== 'pvp';
     $('labelX').textContent = label('X');
     $('labelO').textContent = label('O');
-    $('round').textContent = `Round ${game.round}`;
+    $('round').textContent = `Round ${game.round} · ${RULE_NAMES[game.rules]}`;
+
+    const note = RULE_NOTES[game.rules];
+    $('rulesNote').hidden = !note;
+    if (note && $('rulesNote').dataset.rules !== game.rules) {
+      $('rulesNote').innerHTML = note;
+      $('rulesNote').dataset.rules = game.rules;
+    }
 
     $('diffSeg').disabled = mode !== 'ai';
+    $('rulesSeg').disabled = mode === 'online' && net.role === 'guest';
     $(`mode-${mode}`).checked = true;
     $(`diff-${difficulty}`).checked = true;
+    $(`rules-${game.rules}`).checked = true;
     const offline = mode === 'online' && !connected();
     $('newRound').disabled = offline;
     $('resetScores').disabled = offline;
@@ -503,14 +754,14 @@ fieldset.seg:disabled label { cursor: default; }
     const dot = $('onlineDot'), text = $('onlineText');
     $('share').hidden = !(net.role === 'host' && net.room && ['waiting', 'connected', 'left'].includes(net.phase));
     $('retryRow').hidden = net.phase !== 'error';
-    const tries = net.attempt ? ` (try ${net.attempt + 1} of 5)` : '';
+    const rulesBit = net.role === 'guest' ? ' Your friend picks the rules.' : '';
     const states = {
-      starting: ['waiting', `Opening a room…${tries}`],
+      starting: ['waiting', 'Opening a room…'],
       waiting: ['waiting', 'Send this link to a friend. You play X, they play O.'],
-      joining: ['waiting', `Connecting to your friend’s room…${tries}`],
+      joining: ['waiting', 'Connecting to your friend’s room…'],
       connected: ['connected', net.role === 'host'
         ? `${net.peerName || 'Your friend'} joined. You play X.`
-        : `Playing with ${net.peerName || 'your friend'}. You play O.`],
+        : `Playing with ${net.peerName || 'your friend'}. You play O.${rulesBit}`],
       left: ['error', net.role === 'host'
         ? `${net.peerName || 'Your friend'} left. They can rejoin with the same link.`
         : 'Lost touch with your friend. Reconnecting when they come back…'],
@@ -523,40 +774,39 @@ fieldset.seg:disabled label { cursor: default; }
   }
 
   // ---------- game flow ----------
-  function applyMove(i) {
-    if (game.gameOver || game.board[i]) return false;
-    game.board[i] = game.current;
-    game.lastMove = i;
-    const w = getWinner(game.board);
-    if (w) {
-      game.gameOver = true; game.result = w; game.scores[w.player]++;
-    } else if (isDraw(game.board)) {
-      game.gameOver = true; game.result = { player: null }; game.scores.D++;
-    } else {
-      game.current = other(game.current);
-    }
-    return true;
-  }
-
   function play(i) {
-    if (!applyMove(i)) return;
+    if (game.gameOver || !legalMoves(game).includes(i)) return;
+    const n = step(game, i);
+    Object.assign(game, n);
+    if (n.winner) {
+      game.gameOver = true; game.result = { player: n.winner, line: n.line }; game.scores[n.winner]++;
+    } else if (n.draw) {
+      game.gameOver = true; game.result = { player: null }; game.scores.D++;
+    }
     render();
     broadcast();
     if (isAiTurn()) scheduleAi();
+  }
+
+  function chooseAiMove() {
+    const moves = legalMoves(game);
+    if (difficulty === 'easy') return pick(moves);
+    if (game.rules === 'vanish') return vanishBest(game);
+    if (game.rules === 'ultimate') return ultimateBest(game);
+    return classicBest(game.board.slice(), AI);
   }
 
   function scheduleAi() {
     clearTimeout(aiTimer);
     aiTimer = setTimeout(() => {
       if (!isAiTurn()) return;
-      const b = game.board.slice();
-      play(difficulty === 'hard' ? bestMove(b, AI) : randomMove(b));
-    }, 420);
+      play(chooseAiMove());
+    }, game.rules === 'ultimate' && difficulty === 'hard' ? 200 : 420);
   }
 
   function onCellClick(i) {
     focusIndex = i;
-    if (!canPlay() || game.board[i]) return;
+    if (!canPlay() || !legalMoves(game).includes(i)) return;
     if (mode === 'online' && net.role === 'guest') {
       send({ t: 'move', i });
       return;
@@ -566,10 +816,9 @@ fieldset.seg:disabled label { cursor: default; }
 
   function startNextRound() {
     clearTimeout(aiTimer);
-    game.board = Array(9).fill(null);
+    Object.assign(game, newEngine(game.rules));
     game.gameOver = false;
     game.result = null;
-    game.lastMove = -1;
     game.round++;
     // Alternate who opens each round.
     game.current = game.round % 2 === 1 ? 'X' : 'O';
@@ -582,6 +831,14 @@ fieldset.seg:disabled label { cursor: default; }
     game.scores = { X: 0, O: 0, D: 0 };
     game.round = 0;
     startNextRound();
+  }
+
+  function changeRules(rules) {
+    clearTimeout(aiTimer);
+    game = freshGame(rules);
+    render();
+    broadcast();
+    if (isAiTurn()) scheduleAi();
   }
 
   function requestNewRound() {
@@ -684,7 +941,7 @@ fieldset.seg:disabled label { cursor: default; }
     if (msg.from !== net.guest) return;
     net.lastSeen = Date.now();
     if (msg.t === 'bye') peerLeft();
-    else if (msg.t === 'move' && Number.isInteger(msg.i) && msg.i >= 0 && msg.i < 9 && game.current === 'O') play(msg.i);
+    else if (msg.t === 'move' && Number.isInteger(msg.i) && game.current === 'O' && legalMoves(game).includes(msg.i)) play(msg.i);
     else if (msg.t === 'new') startNextRound();
     else if (msg.t === 'reset') resetScores();
     else if (msg.t === 'name') { net.peerName = cleanName(msg.name); render(); broadcast(); }
@@ -696,7 +953,7 @@ fieldset.seg:disabled label { cursor: default; }
       return;
     }
     if (net.host && msg.from !== net.host) return;
-    if (msg.t === 'state' && msg.game) {
+    if (msg.t === 'state' && msg.game && RULE_NAMES[msg.game.rules]) {
       if (net.host === msg.from && msg.seq <= net.seq) { net.lastSeen = Date.now(); return; }
       net.host = msg.from;
       net.seq = msg.seq;
@@ -730,7 +987,7 @@ fieldset.seg:disabled label { cursor: default; }
 
   function resetNet() {
     Object.assign(net, {
-      role: null, room: null, es: null, phase: 'idle', error: '', attempt: 0,
+      role: null, room: null, es: null, phase: 'idle', error: '',
       guest: null, host: null, seq: 0, lastSeen: 0, lastSent: 0, helloCount: 0, subscribed: false, peerName: ''
     });
   }
@@ -769,8 +1026,8 @@ fieldset.seg:disabled label { cursor: default; }
     clearTimeout(aiTimer);
     if (mode === 'online') teardownOnline();
     mode = next;
-    game = freshGame();
-    rendered.fill(undefined);
+    game = freshGame(game.rules);
+    resetRendered();
     if (mode === 'online') hostRoom();
     render();
     if (isAiTurn()) scheduleAi();
@@ -778,8 +1035,10 @@ fieldset.seg:disabled label { cursor: default; }
 
   // ---------- controls ----------
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', e => switchMode(e.target.value)));
+  document.querySelectorAll('input[name="rules"]').forEach(r => r.addEventListener('change', e => changeRules(e.target.value)));
   document.querySelectorAll('input[name="diff"]').forEach(r => r.addEventListener('change', e => {
-    difficulty = e.target.value; game = freshGame(); rendered.fill(undefined); render();
+    clearTimeout(aiTimer);
+    difficulty = e.target.value; game = freshGame(game.rules); resetRendered(); render();
   }));
   $('newRound').addEventListener('click', requestNewRound);
   $('resetScores').addEventListener('click', () => { $('actions').hidden = true; $('confirm').hidden = false; $('confirmNo').focus(); });
@@ -797,15 +1056,26 @@ fieldset.seg:disabled label { cursor: default; }
   $('shareLink').addEventListener('focus', e => e.target.select());
   $('retryOnline').addEventListener('click', retryOnline);
 
+  // Arrow keys move over the visible grid: 3×3 normally, 9×9 in Ultimate.
+  const toRC = i => {
+    if (game.rules !== 'ultimate') return [Math.floor(i / 3), i % 3];
+    const b = Math.floor(i / 9), s = i % 9;
+    return [Math.floor(b / 3) * 3 + Math.floor(s / 3), (b % 3) * 3 + (s % 3)];
+  };
+  const fromRC = (r, c) => {
+    if (game.rules !== 'ultimate') return r * 3 + c;
+    return (Math.floor(r / 3) * 3 + Math.floor(c / 3)) * 9 + (r % 3) * 3 + (c % 3);
+  };
   boardEl.addEventListener('keydown', e => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
     e.preventDefault();
-    let r = Math.floor(focusIndex / 3), c = focusIndex % 3;
-    if (e.key === 'ArrowLeft') c = (c + 2) % 3;
-    if (e.key === 'ArrowRight') c = (c + 1) % 3;
-    if (e.key === 'ArrowUp') r = (r + 2) % 3;
-    if (e.key === 'ArrowDown') r = (r + 1) % 3;
-    focusIndex = r * 3 + c;
+    const size = game.rules === 'ultimate' ? 9 : 3;
+    let [r, c] = toRC(focusIndex);
+    if (e.key === 'ArrowLeft') c = (c + size - 1) % size;
+    if (e.key === 'ArrowRight') c = (c + 1) % size;
+    if (e.key === 'ArrowUp') r = (r + size - 1) % size;
+    if (e.key === 'ArrowDown') r = (r + 1) % size;
+    focusIndex = fromRC(r, c);
     cells.forEach((cell, i) => cell.tabIndex = i === focusIndex ? 0 : -1);
     cells[focusIndex].focus();
   });
