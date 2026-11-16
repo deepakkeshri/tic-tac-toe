@@ -216,6 +216,9 @@ fieldset.seg:disabled label { cursor: default; }
       <input id="shareLink" readonly aria-label="Invite link">
       <button class="btn small" id="copyLink" type="button">Copy link</button>
     </div>
+    <div class="share" id="retryRow" hidden>
+      <button class="btn small" id="retryOnline" type="button">Try again</button>
+    </div>
   </section>
 
   <div class="status x" id="status" role="status" aria-live="polite"></div>
@@ -441,11 +444,13 @@ fieldset.seg:disabled label { cursor: default; }
     $('online').hidden = mode !== 'online';
     if (mode !== 'online') return;
     const dot = $('onlineDot'), text = $('onlineText');
-    $('share').hidden = !(net.role === 'host' && net.room && net.phase !== 'error');
+    $('share').hidden = !(net.role === 'host' && net.room && ['waiting', 'connected', 'left'].includes(net.phase));
+    $('retryRow').hidden = net.phase !== 'error';
+    const tries = net.attempt ? ` (try ${net.attempt + 1} of 5)` : '';
     const states = {
-      starting: ['waiting', 'Opening a room…'],
+      starting: ['waiting', `Opening a room…${tries}`],
       waiting: ['waiting', 'Send this link to a friend. You play X, they play O.'],
-      joining: ['waiting', 'Connecting to your friend’s room…'],
+      joining: ['waiting', `Connecting to your friend’s room…${tries}`],
       connected: ['connected', net.role === 'host' ? 'Your friend is here. You play X.' : 'Connected. You play O.'],
       left: ['error', net.role === 'host'
         ? 'Your friend left. They can rejoin with the same link.'
@@ -573,11 +578,11 @@ fieldset.seg:disabled label { cursor: default; }
   }, 2000);
   window.addEventListener('pagehide', () => send({ t: 'bye' }));
 
-  function teardownOnline() {
+  function teardownOnline(keepUrl) {
     try { net.conn && net.conn.close(); } catch (e) {}
     try { net.peer && net.peer.destroy(); } catch (e) {}
-    Object.assign(net, { role: null, peer: null, conn: null, room: null, phase: 'idle', error: '' });
-    if (new URLSearchParams(location.search).has('room')) {
+    Object.assign(net, { role: null, peer: null, conn: null, room: null, phase: 'idle', error: '', attempt: 0 });
+    if (!keepUrl && new URLSearchParams(location.search).has('room')) {
       history.replaceState(null, '', location.pathname);
     }
   }
@@ -588,14 +593,27 @@ fieldset.seg:disabled label { cursor: default; }
     return true;
   }
 
+  // Errors from the public PeerJS server that are usually gone a moment later.
+  const TRANSIENT = ['server-error', 'socket-error', 'socket-closed', 'network', 'unavailable-id'];
+  const retryLater = (attempt, peer, fn) => {
+    try { peer.destroy(); } catch (e) {}
+    setTimeout(() => { if (mode === 'online' && net.peer === peer) fn(attempt + 1); }, 700 * (attempt + 1));
+  };
+  // After the room is open, losing the server only stops new joins; keep playing and quietly reconnect.
+  const keepAlive = peer => setTimeout(() => {
+    if (!peer.destroyed && peer.disconnected) { try { peer.reconnect(); } catch (e) {} }
+  }, 1500);
+
   function hostRoom(attempt = 0) {
     if (noPeerLibrary()) return;
     net.role = 'host';
     net.room = makeRoomCode();
+    net.attempt = attempt;
     setPhase('starting');
-    const peer = new Peer(ROOM_PREFIX + net.room);
+    const peer = new Peer(ROOM_PREFIX + net.room, { debug: 0 });
     net.peer = peer;
-    peer.on('open', () => setPhase('waiting'));
+    let opened = false;
+    peer.on('open', () => { opened = true; if (net.phase !== 'connected') setPhase('waiting'); });
     peer.on('connection', conn => {
       if (net.conn && net.conn.open) { conn.on('open', () => { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
       net.conn = conn;
@@ -603,11 +621,24 @@ fieldset.seg:disabled label { cursor: default; }
       conn.on('data', onHostData);
       conn.on('close', () => { if (net.conn === conn) { net.conn = null; if (mode === 'online') setPhase('left'); } });
     });
-    peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+    peer.on('disconnected', () => keepAlive(peer));
     peer.on('error', err => {
-      if (err.type === 'unavailable-id' && attempt < 3) { peer.destroy(); hostRoom(attempt + 1); return; }
-      setPhase('error', 'Could not open a room. Check your connection and pick Online again.');
+      if (opened) { if (TRANSIENT.includes(err.type)) keepAlive(peer); return; }
+      if (TRANSIENT.includes(err.type) && attempt < 4) { retryLater(attempt, peer, hostRoom); return; }
+      try { peer.destroy(); } catch (e) {}
+      setPhase('error', `Could not open a room (${err.type || 'unknown error'}). ${blockedHint(err)}`);
     });
+  }
+
+  function blockedHint(err) {
+    if (err.type === 'browser-incompatible') return 'This browser does not support online play. Try a recent Chrome, Edge, Firefox or Safari.';
+    return 'The free connection server may be busy, or an ad blocker or work network may be blocking peerjs.com. Try again in a moment.';
+  }
+
+  function retryOnline() {
+    const { role, room } = net;
+    teardownOnline(true);
+    if (role === 'guest' && room) joinRoom(room); else hostRoom();
   }
 
   function onHostData(msg) {
@@ -617,14 +648,19 @@ fieldset.seg:disabled label { cursor: default; }
     else if (msg.t === 'reset') resetScores();
   }
 
-  function joinRoom(room) {
+  function joinRoom(room, attempt = 0) {
+    if (typeof room === 'number') { attempt = room; room = net.room; }
     if (noPeerLibrary()) return;
     net.role = 'guest';
     net.room = room;
+    net.attempt = attempt;
     setPhase('joining');
-    const peer = new Peer();
+    const peer = new Peer({ debug: 0 });
     net.peer = peer;
+    let opened = false;
+    peer.on('disconnected', () => { if (opened) keepAlive(peer); });
     peer.on('open', () => {
+      opened = true;
       const conn = peer.connect(ROOM_PREFIX + room, { reliable: true });
       net.conn = conn;
       conn.on('open', () => setPhase('connected'));
@@ -636,10 +672,14 @@ fieldset.seg:disabled label { cursor: default; }
       conn.on('close', () => { if (mode === 'online' && net.phase !== 'error') setPhase('left'); });
     });
     peer.on('error', err => {
-      const msg = err.type === 'peer-unavailable'
-        ? 'That game is no longer open. Ask your friend to send a new link.'
-        : 'Could not connect. Check your connection and reload the invite link.';
-      setPhase('error', msg);
+      if (err.type === 'peer-unavailable') {
+        setPhase('error', 'That game is no longer open. Ask your friend to send a new link.');
+        return;
+      }
+      if (net.phase === 'connected') { if (TRANSIENT.includes(err.type)) keepAlive(peer); return; }
+      if (TRANSIENT.includes(err.type) && attempt < 4) { retryLater(attempt, peer, joinRoom); return; }
+      try { peer.destroy(); } catch (e) {}
+      setPhase('error', `Could not connect (${err.type || 'unknown error'}). ${blockedHint(err)}`);
     });
   }
 
@@ -673,6 +713,7 @@ fieldset.seg:disabled label { cursor: default; }
     setTimeout(() => { btn.textContent = 'Copy link'; }, 1800);
   });
   $('shareLink').addEventListener('focus', e => e.target.select());
+  $('retryOnline').addEventListener('click', retryOnline);
 
   boardEl.addEventListener('keydown', e => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
