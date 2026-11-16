@@ -3,7 +3,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Margin Tic-Tac-Toe</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -19,6 +18,8 @@
   --sheet: #fbfcf8;
   --rule: #c9d2dc;
   --focus: #e0a500;
+  --ok: #2f8a4c;
+  --wait: #c58a00;
   --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 }
@@ -26,18 +27,22 @@
   :root:not([data-theme="light"]) {
     --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
     --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
+    --ok: #5fd08a; --wait: #f2c14e;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #141a24; --grid: #1f2836; --graphite: #e4e8ee; --muted: #8e98a6;
   --ink-x: #7ea2ff; --ink-o: #ff8a73; --sheet: #19212d; --rule: #2e3a4b; --focus: #f2c14e;
+  --ok: #5fd08a; --wait: #f2c14e;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body {
+  margin: 0;
   background-color: var(--paper);
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
@@ -45,9 +50,10 @@ body {
   background-size: 24px 24px;
   color: var(--graphite);
   font-family: var(--font-mono);
+  font-size: 14px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 32px 48px;
+  padding-block: max(32px, env(safe-area-inset-top, 0px)) max(48px, env(safe-area-inset-bottom, 0px));
 }
 .sheet {
   max-width: 520px;
@@ -76,7 +82,7 @@ h1 .o { color: var(--ink-o); }
 .round { font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
-.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg label {
@@ -89,6 +95,27 @@ fieldset.seg { margin: 0; min-width: 0; position: relative; }
 fieldset.seg:disabled { opacity: .4; }
 fieldset.seg:disabled label { cursor: default; }
 
+/* Online room panel: reads like a note clipped to the sheet */
+.online {
+  border: 1.5px dashed var(--rule);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.online-row { display: flex; align-items: center; gap: 10px; font-size: .82rem; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot[data-state="waiting"] { background: var(--wait); animation: pulse 1.4s ease-in-out infinite; }
+.dot[data-state="connected"] { background: var(--ok); }
+.dot[data-state="error"] { background: var(--ink-o); }
+@keyframes pulse { 50% { opacity: .3; } }
+.share { display: flex; gap: 8px; flex-wrap: wrap; }
+.share input {
+  flex: 1 1 180px; min-width: 0;
+  font: .78rem var(--font-mono); color: var(--graphite);
+  background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 8px 12px;
+}
+.share input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
 .status {
   font-family: var(--font-display);
   font-weight: 500;
@@ -98,7 +125,7 @@ fieldset.seg:disabled label { cursor: default; }
 }
 .status .chip {
   font-family: var(--font-mono); font-weight: 600; font-size: .8rem;
-  width: 1.9em; height: 1.9em; display: inline-grid; place-items: center;
+  width: 1.9em; height: 1.9em; display: inline-grid; place-items: center; flex: none;
   border-radius: 50%; border: 1.5px solid currentColor;
 }
 .status.x .chip { color: var(--ink-x); }
@@ -135,8 +162,8 @@ fieldset.seg:disabled label { cursor: default; }
 .overlay .gridline { stroke: var(--graphite); stroke-width: 2.4; fill: none; stroke-linecap: round; }
 .overlay .winline { stroke: var(--graphite); stroke-width: 5; fill: none; stroke-linecap: round; opacity: .85; }
 
-.tally { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); padding-top: 16px; }
-.tally div { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.tally { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); padding-top: 16px; margin: 0; }
+.tally div { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
 .tally dt { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .tally dd { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; font-variant-numeric: tabular-nums; }
 .tally .tx dd { color: var(--ink-x); }
@@ -148,15 +175,18 @@ fieldset.seg:disabled label { cursor: default; }
   font: 600 .85rem var(--font-mono); padding: 10px 18px; border-radius: 999px; cursor: pointer;
   border: 1.5px solid var(--graphite); background: var(--graphite); color: var(--sheet);
 }
+.btn.small { padding: 7px 14px; font-size: .78rem; }
 .btn.ghost { background: transparent; color: var(--graphite); }
 .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .btn:hover { filter: brightness(1.12); }
+.btn:disabled { opacity: .4; cursor: default; filter: none; }
 .confirm { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: .82rem; }
 .hint { text-align: center; font-size: .72rem; color: var(--muted); margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .draw-in { animation: none; stroke-dashoffset: 0; }
   .seg label, .cell.dim { transition: none; }
+  .dot[data-state="waiting"] { animation: none; }
 }
 </style>
 
@@ -170,7 +200,8 @@ fieldset.seg:disabled label { cursor: default; }
     <fieldset class="seg" id="modeSeg">
       <legend>Opponent</legend>
       <input type="radio" name="mode" id="mode-ai" value="ai" checked><label for="mode-ai">vs Computer</label>
-      <input type="radio" name="mode" id="mode-pvp" value="pvp"><label for="mode-pvp">2 Players</label>
+      <input type="radio" name="mode" id="mode-pvp" value="pvp"><label for="mode-pvp">Same device</label>
+      <input type="radio" name="mode" id="mode-online" value="online"><label for="mode-online">Online</label>
     </fieldset>
     <fieldset class="seg" id="diffSeg">
       <legend>Difficulty</legend>
@@ -178,6 +209,14 @@ fieldset.seg:disabled label { cursor: default; }
       <input type="radio" name="diff" id="diff-hard" value="hard" checked><label for="diff-hard">Hard</label>
     </fieldset>
   </div>
+
+  <section class="online" id="online" hidden aria-label="Online room">
+    <div class="online-row"><span class="dot" id="onlineDot"></span><span id="onlineText"></span></div>
+    <div class="share" id="share" hidden>
+      <input id="shareLink" readonly aria-label="Invite link">
+      <button class="btn small" id="copyLink" type="button">Copy link</button>
+    </div>
+  </section>
 
   <div class="status x" id="status" role="status" aria-live="polite"></div>
 
@@ -211,6 +250,7 @@ fieldset.seg:disabled label { cursor: default; }
   <p class="hint">Arrow keys move between squares · Enter or Space plays</p>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (() => {
   const WIN_LINES = [
@@ -263,19 +303,26 @@ fieldset.seg:disabled label { cursor: default; }
 
   // ---------- state ----------
   const AI = 'O';
-  let state = {
+  const ROOM_PREFIX = 'margin-ttt-';
+  const freshGame = () => ({
     board: Array(9).fill(null),
     current: 'X',
-    mode: 'ai',
-    difficulty: 'hard',
     scores: { X: 0, O: 0, D: 0 },
     round: 1,
     gameOver: false,
     result: null,
     lastMove: -1
-  };
+  });
+  let game = freshGame();
+  let mode = 'ai';
+  let difficulty = 'hard';
   let aiTimer = null;
   let focusIndex = 4;
+
+  // Online: the host owns the game and is X; the guest sends requests and mirrors the host's state.
+  const net = { role: null, peer: null, conn: null, room: null, phase: 'idle', error: '' };
+  const myMark = () => (net.role === 'host' ? 'X' : 'O');
+  const connected = () => net.phase === 'connected';
 
   // ---------- DOM ----------
   const $ = id => document.getElementById(id);
@@ -298,25 +345,36 @@ fieldset.seg:disabled label { cursor: default; }
   const SVG_X_STATIC = SVG_X.replace(/ class="draw-in( second)?"/g, '');
   const SVG_O_STATIC = SVG_O.replace(/ class="draw-in"/g, '');
 
-  const isAiTurn = () => state.mode === 'ai' && state.current === AI && !state.gameOver;
-  const nameOf = p => state.mode === 'ai' ? (p === 'X' ? 'You' : 'Computer') : `Player ${p}`;
+  const isAiTurn = () => mode === 'ai' && game.current === AI && !game.gameOver;
+  function canPlay() {
+    if (game.gameOver) return false;
+    if (mode === 'ai') return game.current !== AI;
+    if (mode === 'online') return connected() && game.current === myMark();
+    return true;
+  }
+  function nameOf(p) {
+    if (mode === 'ai') return p === 'X' ? 'You' : 'Computer';
+    if (mode === 'online') return p === myMark() ? 'You' : 'Your friend';
+    return `Player ${p}`;
+  }
 
   // ---------- rendering ----------
   const rendered = Array(9).fill(null);
   function render() {
-    const { board, result } = state;
+    const { board, result } = game;
     const winLine = result && result.line;
+    const playable = canPlay();
     for (let i = 0; i < 9; i++) {
       const c = cells[i], v = board[i];
       if (rendered[i] !== v) {
-        c.innerHTML = v ? (i === state.lastMove ? (v === 'X' ? SVG_X : SVG_O) : (v === 'X' ? SVG_X_STATIC : SVG_O_STATIC)) : '';
+        c.innerHTML = v ? (i === game.lastMove ? (v === 'X' ? SVG_X : SVG_O) : (v === 'X' ? SVG_X_STATIC : SVG_O_STATIC)) : '';
         rendered[i] = v;
       }
       c.classList.toggle('x', v === 'X');
       c.classList.toggle('o', v === 'O');
       c.classList.toggle('dim', !!winLine && !winLine.includes(i));
-      c.setAttribute('aria-disabled', String(!!v || state.gameOver || isAiTurn()));
-      c.dataset.ghost = state.current;
+      c.setAttribute('aria-disabled', String(!!v || !playable));
+      c.dataset.ghost = game.current;
       const row = Math.floor(i / 3) + 1, col = (i % 3) + 1;
       c.setAttribute('aria-label', `Row ${row}, column ${col}, ${v ? v : 'empty'}`);
       c.tabIndex = i === focusIndex ? 0 : -1;
@@ -325,18 +383,22 @@ fieldset.seg:disabled label { cursor: default; }
     // status line
     const st = $('status');
     st.className = 'status';
+    const say = (cls, chip, msg) => { st.classList.add(cls); st.innerHTML = `<span class="chip">${chip}</span> ${msg}`; };
     if (result && result.player) {
-      st.classList.add(result.player.toLowerCase());
       const who = nameOf(result.player);
-      st.innerHTML = `<span class="chip">${result.player}</span> ${who === 'You' ? 'You win this round.' : who + ' wins this round.'}`;
+      say(result.player.toLowerCase(), result.player, who === 'You' ? 'You win this round.' : `${who} wins this round.`);
     } else if (result) {
-      st.classList.add('draw');
-      st.innerHTML = `<span class="chip">=</span> Cat's game. Nobody wins.`;
+      say('draw', '=', "Cat's game. Nobody wins.");
+    } else if (mode === 'online' && !connected()) {
+      say(myMark().toLowerCase(), myMark(), net.role === 'host' ? 'Waiting for your friend to join.' : 'Joining the game…');
     } else {
-      st.classList.add(state.current.toLowerCase());
-      const who = nameOf(state.current);
-      const msg = isAiTurn() ? 'Computer is thinking…' : (who === 'You' ? 'Your move.' : `${who} to move.`);
-      st.innerHTML = `<span class="chip">${state.current}</span> ${msg}`;
+      const who = nameOf(game.current);
+      let msg;
+      if (isAiTurn()) msg = 'Computer is thinking…';
+      else if (who === 'You') msg = 'Your move.';
+      else if (mode === 'online') msg = 'Your friend is thinking…';
+      else msg = `${who} to move.`;
+      say(game.current.toLowerCase(), game.current, msg);
     }
 
     // win line across the board
@@ -354,35 +416,68 @@ fieldset.seg:disabled label { cursor: default; }
 
     // tally
     const tallyMarks = n => n > 20 ? '' : '||||/ '.repeat(Math.floor(n / 5)) + '|'.repeat(n % 5);
-    $('scoreX').textContent = state.scores.X;
-    $('scoreO').textContent = state.scores.O;
-    $('scoreD').textContent = state.scores.D;
-    $('marksX').textContent = tallyMarks(state.scores.X);
-    $('marksO').textContent = tallyMarks(state.scores.O);
-    $('marksD').textContent = tallyMarks(state.scores.D);
-    $('labelX').textContent = state.mode === 'ai' ? 'You · X' : 'Player X';
-    $('labelO').textContent = state.mode === 'ai' ? 'Computer · O' : 'Player O';
-    $('round').textContent = `Round ${state.round}`;
+    $('scoreX').textContent = game.scores.X;
+    $('scoreO').textContent = game.scores.O;
+    $('scoreD').textContent = game.scores.D;
+    $('marksX').textContent = tallyMarks(game.scores.X);
+    $('marksO').textContent = tallyMarks(game.scores.O);
+    $('marksD').textContent = tallyMarks(game.scores.D);
+    const label = p => mode === 'pvp' ? `Player ${p}` : `${nameOf(p).replace('Your friend', 'Friend')} · ${p}`;
+    $('labelX').textContent = label('X');
+    $('labelO').textContent = label('O');
+    $('round').textContent = `Round ${game.round}`;
 
-    $('diffSeg').disabled = state.mode !== 'ai';
-    $(`mode-${state.mode}`).checked = true;
-    $(`diff-${state.difficulty}`).checked = true;
+    $('diffSeg').disabled = mode !== 'ai';
+    $(`mode-${mode}`).checked = true;
+    $(`diff-${difficulty}`).checked = true;
+    const offline = mode === 'online' && !connected();
+    $('newRound').disabled = offline;
+    $('resetScores').disabled = offline;
+
+    renderOnline();
+  }
+
+  function renderOnline() {
+    $('online').hidden = mode !== 'online';
+    if (mode !== 'online') return;
+    const dot = $('onlineDot'), text = $('onlineText');
+    $('share').hidden = !(net.role === 'host' && net.room && net.phase !== 'error');
+    const states = {
+      starting: ['waiting', 'Opening a room…'],
+      waiting: ['waiting', 'Send this link to a friend. You play X, they play O.'],
+      joining: ['waiting', 'Connecting to your friend’s room…'],
+      connected: ['connected', net.role === 'host' ? 'Your friend is here. You play X.' : 'Connected. You play O.'],
+      left: ['error', net.role === 'host'
+        ? 'Your friend left. They can rejoin with the same link.'
+        : 'The connection dropped. Reload the invite link to rejoin.'],
+      error: ['error', net.error || 'Something went wrong with the connection.']
+    };
+    const [d, t] = states[net.phase] || ['', ''];
+    dot.dataset.state = d;
+    text.textContent = t;
+    if (net.room) $('shareLink').value = inviteLink(net.room);
   }
 
   // ---------- game flow ----------
-  function play(i) {
-    if (state.gameOver || state.board[i]) return;
-    state.board[i] = state.current;
-    state.lastMove = i;
-    const w = getWinner(state.board);
+  function applyMove(i) {
+    if (game.gameOver || game.board[i]) return false;
+    game.board[i] = game.current;
+    game.lastMove = i;
+    const w = getWinner(game.board);
     if (w) {
-      state.gameOver = true; state.result = w; state.scores[w.player]++;
-    } else if (isDraw(state.board)) {
-      state.gameOver = true; state.result = { player: null }; state.scores.D++;
+      game.gameOver = true; game.result = w; game.scores[w.player]++;
+    } else if (isDraw(game.board)) {
+      game.gameOver = true; game.result = { player: null }; game.scores.D++;
     } else {
-      state.current = other(state.current);
+      game.current = other(game.current);
     }
+    return true;
+  }
+
+  function play(i) {
+    if (!applyMove(i)) return;
     render();
+    broadcast();
     if (isAiTurn()) scheduleAi();
   }
 
@@ -390,55 +485,197 @@ fieldset.seg:disabled label { cursor: default; }
     clearTimeout(aiTimer);
     aiTimer = setTimeout(() => {
       if (!isAiTurn()) return;
-      const b = state.board.slice();
-      const move = state.difficulty === 'hard' ? bestMove(b, AI) : randomMove(b);
-      play(move);
+      const b = game.board.slice();
+      play(difficulty === 'hard' ? bestMove(b, AI) : randomMove(b));
     }, 420);
   }
 
   function onCellClick(i) {
-    if (isAiTurn()) return;
     focusIndex = i;
+    if (!canPlay() || game.board[i]) return;
+    if (mode === 'online' && net.role === 'guest') {
+      send({ t: 'move', i });
+      return;
+    }
     play(i);
   }
 
-  function newRound() {
+  function startNextRound() {
     clearTimeout(aiTimer);
-    state.board = Array(9).fill(null);
-    state.gameOver = false;
-    state.result = null;
-    state.lastMove = -1;
-    state.round++;
-    // Alternate who opens each round so the computer gets to start sometimes.
-    state.current = state.round % 2 === 1 ? 'X' : 'O';
+    game.board = Array(9).fill(null);
+    game.gameOver = false;
+    game.result = null;
+    game.lastMove = -1;
+    game.round++;
+    // Alternate who opens each round.
+    game.current = game.round % 2 === 1 ? 'X' : 'O';
+    render();
+    broadcast();
+    if (isAiTurn()) scheduleAi();
+  }
+
+  function resetScores() {
+    game.scores = { X: 0, O: 0, D: 0 };
+    game.round = 0;
+    startNextRound();
+  }
+
+  function requestNewRound() {
+    if (mode === 'online' && net.role === 'guest') return send({ t: 'new' });
+    startNextRound();
+  }
+  function requestReset() {
+    if (mode === 'online' && net.role === 'guest') return send({ t: 'reset' });
+    resetScores();
+  }
+
+  // ---------- online play (PeerJS, browser to browser) ----------
+  function inviteLink(room) {
+    return `${location.origin}${location.pathname}?room=${room}`;
+  }
+  function makeRoomCode() {
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+    let s = '';
+    const rnd = crypto.getRandomValues(new Uint32Array(6));
+    for (const n of rnd) s += abc[n % abc.length];
+    return s;
+  }
+  function send(msg) {
+    if (net.conn && net.conn.open) net.conn.send(msg);
+  }
+  function broadcast() {
+    if (mode === 'online' && net.role === 'host') send({ t: 'state', game });
+  }
+  function setPhase(phase, error) {
+    net.phase = phase;
+    net.error = error || '';
+    if (phase === 'connected') net.lastSeen = Date.now();
+    render();
+  }
+
+  // Heartbeat: a closed tab or lost network can take a long time to surface on its own.
+  function peerLeft() {
+    if (net.phase !== 'connected') return;
+    const conn = net.conn;
+    if (net.role === 'host') net.conn = null;
+    try { conn && conn.close(); } catch (e) {}
+    setPhase('left');
+  }
+  function heard(msg) {
+    net.lastSeen = Date.now();
+    if (msg && msg.t === 'bye') { peerLeft(); return true; }
+    return !!(msg && msg.t === 'ping');
+  }
+  setInterval(() => {
+    if (mode !== 'online' || !connected()) return;
+    send({ t: 'ping' });
+    if (Date.now() - net.lastSeen > 7000) peerLeft();
+  }, 2000);
+  window.addEventListener('pagehide', () => send({ t: 'bye' }));
+
+  function teardownOnline() {
+    try { net.conn && net.conn.close(); } catch (e) {}
+    try { net.peer && net.peer.destroy(); } catch (e) {}
+    Object.assign(net, { role: null, peer: null, conn: null, room: null, phase: 'idle', error: '' });
+    if (new URLSearchParams(location.search).has('room')) {
+      history.replaceState(null, '', location.pathname);
+    }
+  }
+
+  function noPeerLibrary() {
+    if (typeof Peer === 'function') return false;
+    setPhase('error', 'Online play could not load. Check your connection and reload the page.');
+    return true;
+  }
+
+  function hostRoom(attempt = 0) {
+    if (noPeerLibrary()) return;
+    net.role = 'host';
+    net.room = makeRoomCode();
+    setPhase('starting');
+    const peer = new Peer(ROOM_PREFIX + net.room);
+    net.peer = peer;
+    peer.on('open', () => setPhase('waiting'));
+    peer.on('connection', conn => {
+      if (net.conn && net.conn.open) { conn.on('open', () => { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 300); }); return; }
+      net.conn = conn;
+      conn.on('open', () => { setPhase('connected'); broadcast(); });
+      conn.on('data', onHostData);
+      conn.on('close', () => { if (net.conn === conn) { net.conn = null; if (mode === 'online') setPhase('left'); } });
+    });
+    peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id' && attempt < 3) { peer.destroy(); hostRoom(attempt + 1); return; }
+      setPhase('error', 'Could not open a room. Check your connection and pick Online again.');
+    });
+  }
+
+  function onHostData(msg) {
+    if (!msg || typeof msg !== 'object' || heard(msg)) return;
+    if (msg.t === 'move' && Number.isInteger(msg.i) && msg.i >= 0 && msg.i < 9 && game.current === 'O') play(msg.i);
+    else if (msg.t === 'new') startNextRound();
+    else if (msg.t === 'reset') resetScores();
+  }
+
+  function joinRoom(room) {
+    if (noPeerLibrary()) return;
+    net.role = 'guest';
+    net.room = room;
+    setPhase('joining');
+    const peer = new Peer();
+    net.peer = peer;
+    peer.on('open', () => {
+      const conn = peer.connect(ROOM_PREFIX + room, { reliable: true });
+      net.conn = conn;
+      conn.on('open', () => setPhase('connected'));
+      conn.on('data', msg => {
+        if (!msg || typeof msg !== 'object' || heard(msg)) return;
+        if (msg.t === 'state' && msg.game) { game = msg.game; render(); }
+        else if (msg.t === 'full') setPhase('error', 'This game already has two players. Ask your friend for a new link.');
+      });
+      conn.on('close', () => { if (mode === 'online' && net.phase !== 'error') setPhase('left'); });
+    });
+    peer.on('error', err => {
+      const msg = err.type === 'peer-unavailable'
+        ? 'That game is no longer open. Ask your friend to send a new link.'
+        : 'Could not connect. Check your connection and reload the invite link.';
+      setPhase('error', msg);
+    });
+  }
+
+  function switchMode(next) {
+    clearTimeout(aiTimer);
+    if (mode === 'online') teardownOnline();
+    mode = next;
+    game = freshGame();
+    rendered.fill(undefined);
+    if (mode === 'online') hostRoom();
     render();
     if (isAiTurn()) scheduleAi();
   }
 
-  function restartFresh() {
-    state.round = 0;
-    newRound();
-  }
-
   // ---------- controls ----------
-  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', e => {
-    state.mode = e.target.value; restartFresh();
-  }));
+  document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', e => switchMode(e.target.value)));
   document.querySelectorAll('input[name="diff"]').forEach(r => r.addEventListener('change', e => {
-    state.difficulty = e.target.value; restartFresh();
+    difficulty = e.target.value; game = freshGame(); rendered.fill(undefined); render();
   }));
-  $('newRound').addEventListener('click', newRound);
+  $('newRound').addEventListener('click', requestNewRound);
   $('resetScores').addEventListener('click', () => { $('actions').hidden = true; $('confirm').hidden = false; $('confirmNo').focus(); });
   $('confirmNo').addEventListener('click', () => { $('confirm').hidden = true; $('actions').hidden = false; $('resetScores').focus(); });
   $('confirmYes').addEventListener('click', () => {
-    state.scores = { X: 0, O: 0, D: 0 };
     $('confirm').hidden = true; $('actions').hidden = false;
-    restartFresh(); $('newRound').focus();
+    requestReset(); $('newRound').focus();
   });
+  $('copyLink').addEventListener('click', async () => {
+    const input = $('shareLink'), btn = $('copyLink');
+    try { await navigator.clipboard.writeText(input.value); btn.textContent = 'Copied'; }
+    catch (e) { input.focus(); input.select(); btn.textContent = 'Press Ctrl+C'; }
+    setTimeout(() => { btn.textContent = 'Copy link'; }, 1800);
+  });
+  $('shareLink').addEventListener('focus', e => e.target.select());
 
   boardEl.addEventListener('keydown', e => {
-    const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -3, ArrowDown: 3 };
-    if (!(e.key in moves)) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
     e.preventDefault();
     let r = Math.floor(focusIndex / 3), c = focusIndex % 3;
     if (e.key === 'ArrowLeft') c = (c + 2) % 3;
@@ -449,22 +686,17 @@ fieldset.seg:disabled label { cursor: default; }
     cells.forEach((cell, i) => cell.tabIndex = i === focusIndex ? 0 : -1);
     cells[focusIndex].focus();
   });
-  // Keep the roving focus target in sync when a square is focused by mouse or Tab.
   boardEl.addEventListener('focusin', e => {
     const i = Number(e.target.dataset.index);
     if (!Number.isNaN(i)) focusIndex = i;
   });
 
-  // ---------- boot (keeps the game across live updates) ----------
-  function start(saved) {
-    if (saved && saved.state) {
-      state = Object.assign(state, saved.state);
-      state.lastMove = -1;
-    }
-    render();
-    if (isAiTurn()) scheduleAi();
+  // ---------- boot ----------
+  const roomParam = (new URLSearchParams(location.search).get('room') || '').toLowerCase();
+  if (/^[a-z0-9]{4,12}$/.test(roomParam)) {
+    mode = 'online';
+    joinRoom(roomParam);
   }
-  window.claude?.hot?.snapshot?.(() => ({ state }));
-  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+  render();
 })();
 </script>
