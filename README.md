@@ -1,5 +1,7 @@
 # Tic-Tac-Toe
 
+**Play it:** https://deepakkeshri.github.io/tic-tac-toe/
+
 A single-file browser game drawn on graph paper. Open `index.html` in any browser — no build step or dependencies.
 
 - Play against the computer or a friend on the same device
